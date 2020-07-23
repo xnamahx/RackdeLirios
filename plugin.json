@@ -1,0 +1,22 @@
+{
+  "slug": "RackdeLirios",
+  "name": "deLirios Modular",
+  "version": "1.0.0",
+  "license": "BSD-3-Clause",
+  "brand": "deLirios",
+  "author": "deLirios",
+  "authorEmail": "delirios.contacto@gmail.com",
+  "authorUrl": "",
+  "pluginUrl": "https://github.com/xnamahx/PushMap",
+  "manualUrl": "https://github.com/xnamahx/PushMap",
+  "sourceUrl": "https://github.com/xnamahx/PushMap",
+  "donateUrl": "",
+  "modules": [
+    {
+      "slug": "PushMap",
+      "name": "PushMap",
+      "description": "core Mapping customized for Push 2",
+      "tags": ["MIDI", "Controller", "Utility"]
+    }
+  ]
+}
