@@ -1,6 +1,8 @@
 #include "plugin.hpp"
-#include "Controls.hpp"
 #include "PushMap.hpp"
+
+#include "Controls.hpp"
+#include "Display.hpp"
 
 struct PushMap : Module {
 
@@ -11,6 +13,8 @@ struct PushMap : Module {
 	PushKnob * knobs[128];
 
 	PushKeyGroup * groups[10];
+
+	Push2Display * display;
 
 	bool shiftMode = false;
 
@@ -95,11 +99,16 @@ struct PushMap : Module {
 		}
 	}
 
+	void attachDisplay(Push2Display * display_) {
+		display = display_;
+	}
+
 	PushMap() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 
 		inputConnected = false;
 		outputConnected = false;
+		display = nullptr;
 		isplaying = false;
 		for(int i = 0; i < 128; i ++) {
 			keyboard[i] = new PushKey(&midiOutput, i);
@@ -172,6 +181,9 @@ struct PushMap : Module {
 
 	void processNote(midi::Message msg) {
 
+		//DEBUG("%s %u", "processNote", msg.getNote());
+        //DEBUG("%s %u", "processNote Status", msg.getStatus());
+        
 		if (!shiftMode && (keyboard[msg.getNote()]->group == 0)) return;
 
 		switch (msg.getStatus()) {
@@ -202,6 +214,7 @@ struct PushMap : Module {
 				values[focusGroup][ccs[focusGroup][i]] = paramQuantity->getScaledValue() * 127.f;
 		}
 
+		display->setLabelsAndValues(&mapLen[focusGroup], paramHandles[focusGroup], values[focusGroup], ccs[focusGroup]);
 	}
 
 	void processKnob(midi::Message msg) {
@@ -209,6 +222,8 @@ struct PushMap : Module {
 		auto knobNum = msg.getNote();
 		auto value = msg.getValue();
         
+        //DEBUG("%s %u %u", "processKnob",knobNum, value);
+
 		if (knobNum == SHIFT && value) {
 			if (shiftMode) shiftMode = false;
 			else shiftMode = true;
@@ -246,6 +261,7 @@ struct PushMap : Module {
 		if(values[focusGroup][knobNum] > 127) values[focusGroup][knobNum] = 127;
 		if(values[focusGroup][knobNum] < 0) values[focusGroup][knobNum] = 0;
 
+		display->setLabelsAndValues(&mapLen[focusGroup], paramHandles[focusGroup], values[focusGroup], ccs[focusGroup]);
 	}
 
 	void processMidi(midi::Message msg) {
@@ -263,6 +279,12 @@ struct PushMap : Module {
 	}
 
 	void process(const ProcessArgs &args) override {
+
+		if (display && !display->display_connected){
+        	//DEBUG("%s", "Process Opening Display");
+			display->open();
+        	//DEBUG("%s", "Process Opening Display Done");
+		}
 
 		if (sampleCounter > args.sampleRate / updateFrequency) {
 
@@ -728,6 +750,14 @@ struct PushMapWidget : ModuleWidget {
 		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(19., 110)), module, PushMap::GATEOUT_OUTPUT));
 		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(32., 110)), module, PushMap::GRT_OUTPUT));
 		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(43., 110)), module, PushMap::GR_OUTPUT));
+
+		Push2Display *push = new Push2Display();
+		push->box.pos = Vec(-959, -159);
+		push->box.size = Vec(960, 160);
+		addChild(push);
+		this->push2 = push;
+
+		if (module) module->attachDisplay(push);
 
 		PushMapDisplay* midiWidget = createWidget<PushMapDisplay>(mm2px(Vec(3.41891, 14.8373)));
 		midiWidget->box.size = mm2px(Vec(43.999, 80));

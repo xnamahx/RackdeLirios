@@ -1,4 +1,17 @@
 # RackdeLirios
 
 #### Installation
-* ```RACK_DIR=<path to Rack SDK> make install```
+
+LIBUSB dependency
+
+* ```git submodule update --init --recursive```
+
+* ```./autogen.sh```
+
+* ```./configure``` 
+
+* ```make```
+
+Create a plugin ZIP package.
+
+* ```RACK_DIR=<path to Rack SDK> make dist```
