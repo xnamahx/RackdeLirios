@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../dep/libusb/libusb/libusb.h"
+#include "libusb.h"
 
 #define ABLETON_VENDOR_ID 0x2982
 #define PUSH2_PRODUCT_ID 0x1967

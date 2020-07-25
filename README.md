@@ -6,11 +6,7 @@ LIBUSB dependency
 
 * ```git submodule update --init --recursive```
 
-* ```./autogen.sh```
-
-* ```./configure``` 
-
-* ```make```
+* ```make dep```
 
 Create a plugin ZIP package.
 

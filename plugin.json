@@ -6,11 +6,11 @@
   "brand": "deLirios",
   "author": "deLirios",
   "authorEmail": "delirios.contacto@gmail.com",
-  "authorUrl": "",
-  "pluginUrl": "https://github.com/xnamahx/PushMap",
-  "manualUrl": "https://github.com/xnamahx/PushMap",
-  "sourceUrl": "https://github.com/xnamahx/PushMap",
-  "donateUrl": "",
+  "authorUrl": "http://delirios.gq",
+  "pluginUrl": "https://github.com/xnamahx/RackdeLirios",
+  "manualUrl": "https://github.com/xnamahx/RackdeLirios",
+  "sourceUrl": "https://github.com/xnamahx/RackdeLirios",
+  "donateUrl": "https://paypal.me/gustavff",
   "modules": [
     {
       "slug": "PushMap",

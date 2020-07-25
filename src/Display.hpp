@@ -23,14 +23,14 @@ public:
   	char ** names;
   	float * values;
   	int * ccs;
+  	int skip = 0;
 
   	int open() {
 
 	    int result = libusb_init(NULL);
 
-	    if (result == 0)
+	    if (result != 0)
 	    {
-	    }else{
 	      	return NULL;
 	    }
 
@@ -56,6 +56,7 @@ public:
     }
 
     void close() {
+    	display_connected = false;
 	    if (device_handle) {
 	        libusb_release_interface(device_handle, 0);
 	        libusb_close(device_handle);
@@ -154,17 +155,21 @@ public:
 			for (int i = 0; i < 160; i++)
 				libusb_bulk_transfer(device_handle, PUSH2_BULK_EP_OUT, &imageDisplay[(159 - i)*1920], 2048, &actual_length, PUSH2_TRANSFER_TIMEOUT);
 
-			/*for (int i = 0; i < PUSH2_DISPLAY_MESSAGES_PER_IMAGE; i++){
-				result = libusb_bulk_transfer(device_handle, PUSH2_BULK_EP_OUT, imageDisplay + (i * PUSH2_DISPLAY_MESSAGE_BUFFER_SIZE), PUSH2_DISPLAY_MESSAGE_BUFFER_SIZE, &actual_length, PUSH2_TRANSFER_TIMEOUT);
-				if (result != 0)
-					break;
-			}*/
 		}
 	}
 
 	void drawFramebuffer() override {
 
+		// It's more important to not lag the frame than to draw the framebuffer
 		NVGcontext* vg = APP->window->vg;
+
+	    dirty = true;
+
+	    skip++;
+		if (skip < 3)
+			return;
+	    skip = 0;
+		//if (module->divider.process()) {
 
 	    if (display_connected) {
 
@@ -188,12 +193,17 @@ public:
 		      image[i * 4 + 3] ^= 0xFF;
 		    }
 	    	
-	    	sendDisplay(image);
-
 	    	nvgRestore(vg);
 	    }
 
-	    dirty = true;
+	    if (display_connected) {
+		    if (APP->window->isFrameOverdue())
+				return;
+
+	    	sendDisplay(image);
+	    }
+
+
 	}
 
 };

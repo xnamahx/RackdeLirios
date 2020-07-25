@@ -1,20 +1,38 @@
 #include "plugin.hpp"
-#include "PushMap.hpp"
-
 #include "Controls.hpp"
+#include "PushMap.hpp"
 #include "Display.hpp"
 
 struct PushMap : Module {
 
+	enum ParamIds {
+		DISPLAY_PARAM,
+		LIGHTS_PARAM,
+		NUM_PARAMS
+	};
+	enum InputIds {
+		NUM_INPUTS
+	};
+	enum OutputIds {
+		CVOUT_OUTPUT,
+		GATEOUT_OUTPUT,
+		GR_OUTPUT,
+		GRT_OUTPUT,
+		NUM_OUTPUTS
+	};
+	enum LightIds {
+		NUM_LIGHTS
+	};
+
 	const float updateFrequency = 400;
 	int sampleCounter = 0;
+
+	Push2Display * display;
 
 	PushKey * keyboard[128];
 	PushKnob * knobs[128];
 
 	PushKeyGroup * groups[10];
-
-	Push2Display * display;
 
 	bool shiftMode = false;
 
@@ -26,28 +44,7 @@ struct PushMap : Module {
 	midi::Output midiOutput;
 	midi::InputQueue midiInput;
 
-	bool inputConnected;
-	bool outputConnected;
-
-	enum ParamIds {
-		NUM_PARAMS
-	};
-	enum InputIds {
-		NUM_INPUTS
-	};
-	enum OutputIds {
-		GATEOUT_OUTPUT,
-		CVOUT_OUTPUT,
-		VELOUT_OUTPUT,
-
-		GR_OUTPUT,
-		GRT_OUTPUT,
-
-		NUM_OUTPUTS
-	};
-	enum LightIds {	
-		NUM_LIGHTS
-	};
+	bool connected;
 
 	/** Number of maps */
 	int mapLen[NUM_GROUPS];
@@ -77,38 +74,58 @@ struct PushMap : Module {
 		msg.setChannel(1);
 		msg.setStatus(cmd);
 		midiOutput.sendMessage(msg);
-	}
-
-	void connectPush() {
-		auto in_devs = midiInput.getDeviceIds();
-		for (int i = 0; i < in_devs.size(); i++){
-			if (midiInput.getDeviceName(in_devs[i]).find("Ableton") != std::string::npos) {
-				midiInput.setDeviceId(in_devs[i]);
-				inputConnected = true;
-				break;
-			}
-		}
-		
-		auto out_devs = midiOutput.getDeviceIds();
-		for (int i = 0; i < out_devs.size(); i++){
-			if (midiOutput.getDeviceName(out_devs[i]).find("Ableton") != std::string::npos) {
-				midiOutput.setDeviceId(out_devs[i]);
-				outputConnected = true;
-				break;
-			}
-		}
+        //DEBUG("%s %u %u", "sendMidi ", note, val);
 	}
 
 	void attachDisplay(Push2Display * display_) {
 		display = display_;
 	}
 
+	void disconnectPush() {
+		if (!connected) {
+			return;
+		}
+
+		for(int i = 0; i < 128; i ++) {
+			keyboard[i]->lightOff();
+			knobs[i]->lightOff();
+		}
+
+		midiInput.setDeviceId(-1);
+		midiOutput.setDeviceId(-1);
+
+		connected = false;
+	}
+	
+	void connectPush() {
+		if (connected) {
+			return;
+		}
+
+		connected = true;
+    	auto findName = midiInput.getDeviceName(midiInput.deviceId).substr (0,3);
+
+		if(findName.length()<1){
+			return;
+		}
+
+		auto out_devs = midiOutput.getDeviceIds();
+		for (int i = 0; i < out_devs.size(); i++){
+
+			if (midiOutput.getDeviceName(out_devs[i]).find(findName) != std::string::npos) {
+				midiOutput.setDeviceId(out_devs[i]);
+				break;
+			}
+		}
+
+	}
+
 	PushMap() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-
-		inputConnected = false;
-		outputConnected = false;
+		configParam(DISPLAY_PARAM, 0.f, 1.f, 0.f, "Push Display Active");
+		configParam(LIGHTS_PARAM, 0.f, 1.f, 0.f, "Push Lights Active");
 		display = nullptr;
+		connected = false;
 		isplaying = false;
 		for(int i = 0; i < 128; i ++) {
 			keyboard[i] = new PushKey(&midiOutput, i);
@@ -180,9 +197,6 @@ struct PushMap : Module {
 	}
 
 	void processNote(midi::Message msg) {
-
-		//DEBUG("%s %u", "processNote", msg.getNote());
-        //DEBUG("%s %u", "processNote Status", msg.getStatus());
         
 		if (!shiftMode && (keyboard[msg.getNote()]->group == 0)) return;
 
@@ -221,8 +235,6 @@ struct PushMap : Module {
 		
 		auto knobNum = msg.getNote();
 		auto value = msg.getValue();
-        
-        //DEBUG("%s %u %u", "processKnob",knobNum, value);
 
 		if (knobNum == SHIFT && value) {
 			if (shiftMode) shiftMode = false;
@@ -280,18 +292,26 @@ struct PushMap : Module {
 
 	void process(const ProcessArgs &args) override {
 
-		if (display && !display->display_connected){
-        	//DEBUG("%s", "Process Opening Display");
-			display->open();
-        	//DEBUG("%s", "Process Opening Display Done");
+		if ((int)params[DISPLAY_PARAM].getValue() == 1) {
+			if (display && !display->display_connected){
+				display->open();
+			}
+		}
+
+		if (params[DISPLAY_PARAM].getValue() == 0.f) {
+			if (display && display->display_connected){
+				display->close();
+			}
+		}
+
+
+		if ((int)params[LIGHTS_PARAM].getValue() == 1) {
+			connectPush();
+		}else{
+			disconnectPush();
 		}
 
 		if (sampleCounter > args.sampleRate / updateFrequency) {
-
-
-			if ((!inputConnected) && (!outputConnected)) {
-				connectPush();
-			}
 
 			midi::Message msg;
 			while (midiInput.shift(&msg)) {
@@ -470,6 +490,10 @@ struct PushMap : Module {
 
 		json_object_set_new(rootJ, "midi", midiInput.toJson());
 
+		json_t* midiJ = json_object_get(rootJ, "midi");
+		if (midiJ)
+			midiInput.fromJson(midiJ);
+
 		return rootJ;
 	}
 
@@ -537,6 +561,11 @@ struct PushMap : Module {
 				values[g][cc] = paramQuantity->getScaledValue() * 127.f;
 			}
 		}
+
+		json_t* midiJ = json_object_get(rootJ, "midi");
+		if (midiJ)
+			midiInput.fromJson(midiJ);
+
 	}
 
 };
@@ -736,8 +765,6 @@ struct PushMapWidget : ModuleWidget {
 
 	PushMapWidget(PushMap* module) {
 
-        DEBUG("%s", "PushMapWidget Init");
-
 		setModule(module);
 		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/PushMapPanel.svg")));
 
@@ -746,11 +773,14 @@ struct PushMapWidget : ModuleWidget {
 		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(8., 110)), module, PushMap::CVOUT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(19., 110)), module, PushMap::GATEOUT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(32., 110)), module, PushMap::GRT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(43., 110)), module, PushMap::GR_OUTPUT));
+		addParam(createParam<CKSS>(mm2px(Vec(23.151, 97.794)), module, PushMap::DISPLAY_PARAM));
+		addParam(createParam<CKSS>(mm2px(Vec(23.204, 111.178)), module, PushMap::LIGHTS_PARAM));
 
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(6.554, 106.694)), module, PushMap::CVOUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(16.416, 106.694)), module, PushMap::GATEOUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(34.745, 106.694)), module, PushMap::GR_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(44.607, 106.694)), module, PushMap::GRT_OUTPUT));
+		
 		Push2Display *push = new Push2Display();
 		push->box.pos = Vec(-959, -159);
 		push->box.size = Vec(960, 160);
@@ -758,12 +788,12 @@ struct PushMapWidget : ModuleWidget {
 		this->push2 = push;
 
 		if (module) module->attachDisplay(push);
-
-		PushMapDisplay* midiWidget = createWidget<PushMapDisplay>(mm2px(Vec(3.41891, 14.8373)));
+		PushMapDisplay* midiWidget = createWidget<PushMapDisplay>(mm2px(Vec(3.41891, 12)));
 		midiWidget->box.size = mm2px(Vec(43.999, 80));
 		midiWidget->setMidiPort(module ? &module->midiInput : NULL);
 		midiWidget->setModule(module);
 		addChild(midiWidget);
+
 	}
 
 };
