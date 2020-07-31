@@ -17,6 +17,12 @@
       "name": "PushMap",
       "description": "core Mapping customized for Push 2",
       "tags": ["MIDI", "Controller", "Utility"]
+    },
+    {
+      "slug": "OSControlMap",
+      "name": "OSControlMap",
+      "description": "core Mapping customized for Open Sound Control",
+      "tags": ["Controller", "Utility"]
     }
   ]
 }
